@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">NumberFacts</string>
+    <string name="info">Info</string>
+    <string name="about_me">I am a creative android developer and aspiring machine learning engineer,I build smart apps that solve complex problems in a simple way.\n
+    Learn more about me on social media and my website below.</string>
+    <string name="my_email">ibrightstar247@gmail.com</string>
+    <string name="my_website">http://ismailnurudeen.xyz</string>
+    <string name="my_fb_id">ismailnurudeen01</string>
+    <string name="my_twitter_id">TeenMutantCoder</string>
+    <string name="copy_right">Copyrights Ismail Nurudeen</string>
+</resources>
