@@ -14,21 +14,44 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
+import com.google.gson.Gson
 import kotlinx.android.synthetic.main.activity_main.*
 import kotlinx.android.synthetic.main.activity_main.view.*
 import java.net.URL
 
 class MainActivity : AppCompatActivity() {
     lateinit var appUtils: AppUtils
+
     @RequiresApi(Build.VERSION_CODES.M)
+    companion object {
+        var currentFact: Fact? = null
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         appUtils = AppUtils(this)
-        getRandomFact()
         random_fact_shuffle_btn.setOnClickListener {
             getRandomFact()
         }
+        random_fact_explore_btn.setOnClickListener {
+            if (currentFact == null) return@setOnClickListener
+            val intent = Intent(this@MainActivity, FactDisplayActivity::class.java)
+            val type = when (currentFact?.type) {
+                "trivia" -> Constants.TYPE_TRIVIA
+                "date" -> Constants.TYPE_DATE
+                "year" -> Constants.TYPE_YEAR
+                else -> -1
+            }
+            intent.putExtra(Constants.EXTRA_FACT_TYPE, type)
+            intent.putExtra("EXTRA_FACT_OBJ", Gson().toJson(currentFact))
+            startActivity(intent)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        getRandomFact()
     }
 
     private fun getRandomFact() {
@@ -89,6 +112,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 result.number
             }
+            currentFact = result
         }
     }
 

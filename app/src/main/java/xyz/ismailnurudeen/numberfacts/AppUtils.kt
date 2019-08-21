@@ -35,6 +35,19 @@ class AppUtils(private val context: Activity) {
         }
     }
 
+    fun getTempImageToShare(bitmap: Bitmap): File {
+        val savePath = File(Environment.getExternalStorageDirectory(), "temp_share_fact.png")
+        try {
+            val outputStream = FileOutputStream(savePath)
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, outputStream)
+            outputStream.flush()
+            outputStream.close()
+        } catch (fnfe: FileNotFoundException) {
+            Log.e("SAVE ERROR", fnfe.localizedMessage)
+        }
+        return savePath
+    }
+
     fun getBitmapFromView(view: View): Bitmap {
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)

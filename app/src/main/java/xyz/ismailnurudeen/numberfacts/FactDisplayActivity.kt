@@ -1,27 +1,37 @@
 package xyz.ismailnurudeen.numberfacts
 
 import android.annotation.SuppressLint
+import android.arch.persistence.room.Room
+import android.graphics.Color
 import android.os.AsyncTask
 import android.os.Bundle
+import android.os.Environment
+import android.support.v4.app.ShareCompat
 import android.support.v4.content.ContextCompat
+import android.support.v4.content.FileProvider
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.CardView
+import android.util.Log
 import android.view.View
 import android.widget.Toast
+import com.google.android.gms.ads.AdRequest
 import com.google.gson.Gson
 import com.like.LikeButton
 import com.like.OnLikeListener
 import kotlinx.android.synthetic.main.layout_facts.*
 import kotlinx.android.synthetic.main.layout_facts.view.*
-import xyz.ismailnurudeen.numberfacts.utilities.MiniDB
+import java.io.File
 import java.net.URL
+import java.util.*
 
 class FactDisplayActivity : AppCompatActivity() {
     private lateinit var appUtils: AppUtils
     var type = 0
+    private var colorIndex = 0
 
     companion object {
         var currentFact: Fact? = null
+        var isFavourite = false
     }
 
     @SuppressLint("NewApi", "SetTextI18n")
@@ -29,40 +39,46 @@ class FactDisplayActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.layout_facts)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
+        fact_layout_bottom_ad.loadAd(AdRequest.Builder()
+                .addTestDevice("EE61FFC39B2F91254A201499649C0082").build())
+
         appUtils = AppUtils(this)
-        val miniDb = MiniDB.open(this, "favourites_db")
-        if (miniDb.readList("facts_db", ArrayList<Fact>() as List<Any>?).isEmpty()) {
-            miniDb.insertList("facts_db", ArrayList<Fact>() as List<Any>?)
-        }
+        val appDb = Room.databaseBuilder(
+                applicationContext,
+                AppDatabase::class.java, "favourite-db"
+        ).allowMainThreadQueries().build()
+        setFactColors(true)
+
         val extras = intent.extras
         val factObjString = extras?.getString("EXTRA_FACT_OBJ")
-        val factObj = if (factObjString.isNullOrEmpty()) {
+        currentFact = if (!factObjString.isNullOrEmpty()) {
+            isFavourite = extras?.getBoolean("IS_FAV_FACT", false)!!
             Gson().fromJson<Fact>(factObjString, Fact::class.java)
         } else {
             null
         }
+
         type = extras?.getInt(Constants.EXTRA_FACT_TYPE) ?: 0
         when (type) {
             Constants.TYPE_TRIVIA -> {
                 supportActionBar?.title = "Trivia Facts"
-                execFactTask("", type, true, factObj)
+                execFactTask("", type, true, currentFact)
                 number_fact_form.visibility = View.VISIBLE
                 facts_input_instruction.text = "Write any number to get fact:"
             }
             Constants.TYPE_DATE -> {
                 supportActionBar?.title = "Date Facts"
-                execFactTask("", type, true, factObj)
+                execFactTask("", type, true, currentFact)
                 date_fact_form.visibility = View.VISIBLE
                 facts_input_instruction.text = "Write any date to get fact:"
             }
             Constants.TYPE_YEAR -> {
                 supportActionBar?.title = "Year Facts"
-                execFactTask("", type, true, factObj)
+                execFactTask("", type, true, currentFact)
                 year_fact_form.visibility = View.VISIBLE
                 facts_input_instruction.text = "Write any year to get fact:"
             }
         }
-
         save_card_btn.setOnClickListener {
             if (currentFact != null) {
                 val card = appUtils.getBitmapFromView(fact_card)
@@ -75,20 +91,10 @@ class FactDisplayActivity : AppCompatActivity() {
         }
         add_to_fav_btn.setOnLikeListener(object : OnLikeListener {
             override fun liked(p0: LikeButton?) {
-                val factsList = miniDb.readList("facts_db", ArrayList<Fact>() as List<Any>?) as ArrayList<Fact>
-                factsList.add(Fact("0 is the number of infinity", "0", true, "trivia"))
-                factsList.add(Fact("10 is a the square root of 100", "10", true, "math"))
-                factsList.add(Fact("101 looks binary", "101", true, "trivia"))
-                factsList.add(Fact("1000 is the same as 10 to the positive power of 3", "1000", true, "math"))
-                factsList.add(Fact("0 is the number of infinity", "0", true, "trivia"))
-                factsList.add(Fact("10 is a the square root of 100", "10", true, "math"))
-                factsList.add(Fact("101 looks binary", "101", true, "trivia"))
-
-                miniDb.insertList("facts_list", factsList as List<Any>?)
                 if (currentFact != null) {
-                    factsList.add(currentFact!!)
-                    miniDb.insertList("facts_list", factsList as List<Any>?)
+                    appDb.getFactDao().insert(currentFact!!)
                     Toast.makeText(this@FactDisplayActivity, "Added to favourite", Toast.LENGTH_SHORT).show()
+
                 } else {
                     Toast.makeText(this@FactDisplayActivity, "Can not add fact to favourite", Toast.LENGTH_SHORT).show()
                     add_to_fav_btn.isLiked = false
@@ -96,64 +102,71 @@ class FactDisplayActivity : AppCompatActivity() {
             }
 
             override fun unLiked(p0: LikeButton?) {
-                val factsList = miniDb.readList("facts_db", ArrayList<Fact>() as List<Any>?) as ArrayList<Fact>
-                if (currentFact != null && factsList.isNotEmpty()) {
-                    factsList.removeAt(factsList.indexOf(currentFact!!))
-                    miniDb.insertList("facts_list", factsList as List<Any>?)
-                    add_to_fav_btn.isLiked = false
-                    Toast.makeText(this@FactDisplayActivity, "Removed from favourite", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this@FactDisplayActivity, "Removed from favourite", Toast.LENGTH_SHORT).show()
-                    add_to_fav_btn.isLiked = false
-                }
+                appDb.getFactDao().delete(currentFact!!)
             }
 
         })
         share_fact_btn.setOnClickListener {
-
-        }
-        text_color_btn.setOnClickListener {
-            setColorFromPicker(it.id)
+            val cardBitmap = appUtils.getBitmapFromView(fact_card)
+            if (appUtils.checkPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE, 105)) {
+                val imageFile = appUtils.getTempImageToShare(cardBitmap)
+                val uri = FileProvider.getUriForFile(this@FactDisplayActivity, BuildConfig.APPLICATION_ID + ".provider", imageFile)
+                ShareCompat.IntentBuilder
+                        .from(this@FactDisplayActivity)
+                        .setType("image/png")
+                        .setText("Shared with NumberFacts app... Download on PlayStore: ${getString(R.string.app_playstore_link_template) + packageName}")
+                        .setStream(uri)
+                        .setChooserTitle("Share Fact with")
+                        .startChooser()
+                imageFile.deleteOnExit()
+            }
         }
         bg_color_btn.setOnClickListener {
-            setColorFromPicker(it.id)
+            setFactColors()
         }
     }
 
-    private fun setColorFromPicker(id: Int) {
-//        val specDial = SpectrumDialog()
-//        specDial.setOnColorSelectedListener { _, color ->
-//            if (id == text_color_btn.id) {
-//                fact_text.setTextColor(color)
-//                fact_num_tv.setTextColor(color)
-//                text_color_btn.setBackgroundColor(color)
-//            } else {
-//                fact_card.setCardBackgroundColor(color)
-//                bg_color_btn.setBackgroundColor(color)
-//                if (appUtils.isWhiteText(color)) {
-//                    Toast.makeText(baseContext, "White Text", Toast.LENGTH_SHORT).show()
-//                } else {
-//                    Toast.makeText(baseContext, "Dark Text", Toast.LENGTH_SHORT).show()
-//                }
-//            }
-//        }
-//        specDial.show(supportFragmentManager, "Pick a Color")
+    override fun onResume() {
+        super.onResume()
+        val tempFile = File(Environment.getExternalStorageDirectory(), "temp_share_fact.png")
+        if (tempFile.exists()) {
+            tempFile.delete()
+            // Toast.makeText(this@FactDisplayActivity, "Deleted!", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun setFactColors(random: Boolean = false) {
+        val colorStrings = resources.getStringArray(R.array.colors)
+        if (random) colorIndex = Random().nextInt(colorStrings.size - 1)
+        if (colorIndex >= colorStrings.size - 1) colorIndex = 0
+
+        val bgColor = Color.parseColor(colorStrings[colorIndex++])
+        Log.i("BG-COLOR:INDEX", "${colorStrings[colorIndex]} : $colorIndex")
+        val txtColor = if (appUtils.isWhiteText(bgColor)) {
+            Color.WHITE
+        } else {
+            Color.DKGRAY
+        }
+        fact_card.setCardBackgroundColor(bgColor)
+        fact_num_tv.setTextColor(txtColor)
+        fact_text.setTextColor(txtColor)
     }
 
 
-    private fun execFactTask(num: String, type: Int, isRandom: Boolean = false, factObj: Fact? = null) {
-        if (appUtils.checkNetworkState() && factObj == null) {
+    private fun execFactTask(num: String, type: Int, isRandom: Boolean = false, favFact: Fact? = null) {
+        if (appUtils.checkNetworkState() && favFact == null) {
             FactQueryTask(fact_card).execute(QueryUtils.getUrl(num, type, isRandom))
-        } else if (factObj != null) {
+        } else if (favFact != null) {
             fact_card_loading.visibility = View.GONE
-            fact_text.text = factObj.text
+            fact_text.text = favFact!!.text
             fact_num_tv.text = if (type == Constants.TYPE_DATE) {
-                val dateValue = factObj.text.split(" ")
+                val dateValue = favFact!!.text.split(" ")
                 if (dateValue.isNotEmpty()) dateValue[0] + " " + dateValue[1]
-                else factObj.number
+                else favFact!!.number
             } else {
-                factObj.number
+                favFact!!.number
             }
+            add_to_fav_btn.isLiked = isFavourite
         } else {
             Toast.makeText(this, "No Internet Connection", Toast.LENGTH_LONG).show()
             fact_card_loading.visibility = View.GONE
@@ -163,6 +176,7 @@ class FactDisplayActivity : AppCompatActivity() {
     }
 
     fun onGetFactClicked(v: View) {
+        add_to_fav_btn.isLiked = false
         val number = when (type) {
             Constants.TYPE_TRIVIA -> {
                 number_fact_input.text.toString()

@@ -8,4 +8,33 @@
     <string name="my_fb_id">ismailnurudeen01</string>
     <string name="my_twitter_id">TeenMutantCoder</string>
     <string name="copy_right">Copyrights Ismail Nurudeen</string>
+    <string name="app_playstore_link_template">https://play.google.com/store/apps/details?id=</string>
+
+    <!--AdMob values-->
+    <string name="app_id">ca-app-pub-6262072701452947~2713879161</string>
+    <string name="bottom_banner_ad_unit">ca-app-pub-6262072701452947/1393351849</string>
+    <string name="fullscreen_ad_unit">ca-app-pub-6262072701452947/8577591696</string>
+
+    <string-array name="colors">
+        <item>#F44336</item>
+        <item>#E91E63</item>
+        <item>#9C27B0</item>
+        <item>#673AB7</item>
+        <item>#3F51B5</item>
+        <item>#2196F3</item>
+        <item>#03A9F4</item>
+        <item>#00BCD4</item>
+        <item>#009688</item>
+        <item>#4CAF50</item>
+        <item>#8BC34A</item>
+        <item>#CDDC39</item>
+        <item>#FFEB3B</item>
+        <item>#FFC107</item>
+        <item>#FF9800</item>
+        <item>#FF5722</item>
+        <item>#795548</item>
+        <item>#9E9E9E</item>
+        <item>#607D8B</item>
+        <item>#263238</item>
+    </string-array>
 </resources>
